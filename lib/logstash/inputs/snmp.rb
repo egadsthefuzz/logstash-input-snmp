@@ -93,18 +93,19 @@ class LogStash::Inputs::SNMP < LogStash::Inputs::Base
               results = walk_host(hostname, @iftable)
 
               results.each do |r|
-                e = LogStash::Event.new('host' => hostname)
-                r.each { |k, v| e[k] = v }
+                event = LogStash::Event.new('host' => hostname)
+                r.each { |k, v| event.set(k, v) }
 
-                add_fields(e)
+                add_fields(event)
 
-                add_custom_fields(e)
+                add_custom_fields(event)
 
-                e["poll_duration"] = Time.now - start
+                event.set('poll_duration', Time.now - start)
+#                e["poll_duration"] = Time.now - start
 
-                decorate(e)
+                decorate(event)
 
-                @mutex.synchronize { queue << e }
+                @mutex.synchronize { queue << event }
               end
               runtime = Time.now - start
               if runtime > @interval
@@ -112,16 +113,16 @@ class LogStash::Inputs::SNMP < LogStash::Inputs::Base
                 "You should increase your interval for #{hostname} (current: #{@interval} seconds) " \
                 "if you keep getting this warning."
               end
-            rescue Exception => e
-              @logger.error "Unhandled Exception in polling thread #{hostname}: #{e.message}"
-              @logger.error e.backtrace.join("\n")
+            rescue Exception => event
+              @logger.error "Unhandled Exception in polling thread #{hostname}: #{event.message}"
+              @logger.error event.backtrace.join("\n")
             end
           end
         end
         @threads.each { |t| t.join; @threads.delete(t) }
-      rescue Exception => e
-        @logger.error "Exception while polling SNMP: #{e.message}"
-        @logger.error e.backtrace.join("\n")
+      rescue Exception => event
+        @logger.error "Exception while polling SNMP: #{event.message}"
+        @logger.error event.backtrace.join("\n")
       end
       Stud.stoppable_sleep(@interval) { stop? }
     end
@@ -138,13 +139,18 @@ class LogStash::Inputs::SNMP < LogStash::Inputs::Base
 
   # add custom fields
   def add_custom_fields event
-    @custom_fields.each { |k, v| event[k] = v }
+#  def add_custom_fields 
+   @custom_fields.each { |k, v| event.set(k, v) }
+#    @custom_fields.each { |k, v| event[k] = v }
   end
 
   # add fields
   def add_fields event
-    event['poll_interval'] = @interval
-    event['device'] = @device
+#  def add_fields
+    event.set('poll_interval', @interval)
+    event.set('device', @device)
+#    event['poll_interval'] = @interval
+#    event['device'] = @device
   end
 
   # do the snmp walk
